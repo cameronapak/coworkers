@@ -38,6 +38,7 @@ import { CHAT_MESSAGE_TYPES } from "agents/chat"
 import type { ContextConfig } from "agents/context"
 import { isAutoReplyEmail } from "agents/email"
 import { emailDirectory } from "./email-directory"
+import { decideToolPolicy, isUntrustedTrigger } from "./tool-policy"
 import {
   createRoutingRule,
   deleteRoutingRule,
@@ -1151,6 +1152,13 @@ export class BotAgent extends Think<Env, BotState> {
     )
   }
 
+  /** The turn was started by mail or a webhook, which anyone can send. */
+  private isUntrustedTurn() {
+    return isUntrustedTrigger(
+      metaOf(this.messages.findLast((m) => m.role === "user")).origin
+    )
+  }
+
   private inbound(): BotInbound {
     const domain = this.env.EMAIL_DOMAIN?.trim()
     // The short name once it is claimed; the long form until the bot has a
@@ -1383,21 +1391,22 @@ export class BotAgent extends Think<Env, BotState> {
   }
 
   /**
-   * The user's rule for this call, adjusted for background turns: nobody is
-   * there to approve, so "ask" becomes "block", while read-only app tools
-   * run so the bot can look around (dots-style proactive research).
+   * The user's rule for this call, adjusted for background turns and for
+   * turns an outsider started (email, webhooks): see `decideToolPolicy`.
    */
   private decide(toolName: string): RulePolicy {
-    const policy = this.policyFor(toolName)
-    if (policy === "block" || !this.isBackgroundTurn()) return policy
-    if (this.#readOnlyAppTools.has(toolName)) return "allow"
-    if (
-      this.#appToolNames.has(toolName) &&
-      this.state.proactive.appsInBackground === true
-    ) {
-      return "allow"
-    }
-    return policy === "ask" ? "block" : "allow"
+    const appTool = this.#appToolNames.has(toolName)
+    return decideToolPolicy({
+      policy: this.policyFor(toolName),
+      ruled:
+        (appTool && !toolName.endsWith("_unavailable")) ||
+        TOOL_CLASS[toolName] !== undefined,
+      background: this.isBackgroundTurn(),
+      untrusted: this.isUntrustedTurn(),
+      appTool,
+      readOnlyAppTool: this.#readOnlyAppTools.has(toolName),
+      appsInBackground: this.state.proactive.appsInBackground === true,
+    })
   }
 
   /** Wrap the hub's catalog as AI SDK tools that call back through the hub. */
@@ -4367,6 +4376,7 @@ export class BotAgent extends Think<Env, BotState> {
     if (looping) return { action: "block", reason: looping }
     const readOnlySecretCall =
       ctx.toolName === "secret_request" &&
+      !this.isUntrustedTurn() &&
       ((ctx.input as { method?: string } | undefined)?.method ?? "GET") ===
         "GET"
     const ruled =
@@ -4381,7 +4391,9 @@ export class BotAgent extends Think<Env, BotState> {
         reason:
           this.policyFor(ruled) === "block"
             ? "The user has blocked this kind of action for you. Tell them what you wanted to do instead of retrying."
-            : "This is background work and this action needs the user's approval, which they cannot give right now. Do not retry. If it matters, tell them what you would do.",
+            : this.isUntrustedTurn()
+              ? "This turn was started by an email or webhook, which anyone can send, so it cannot take actions. Do not retry. If it matters, tell the user what you would do."
+              : "This is background work and this action needs the user's approval, which they cannot give right now. Do not retry. If it matters, tell them what you would do.",
       }
     }
     if (ctx.toolName !== "set_name" && ctx.toolName !== "set_context") {
