@@ -17,6 +17,7 @@ const deploy: Partial<{
   gateway: string
   accessTeamDomain: string
   accessAud: string
+  allowDemo: boolean
   emailDomain: string
   emailZoneId: string
 }> =
@@ -128,10 +129,13 @@ export default defineConfig({
       AI_GATEWAY_ID: bindings.text(deploy.gateway ?? ""),
       // Cloudflare Access in front of the Worker. When both are set, every
       // request must carry a valid Access JWT for this application; without
-      // them everyone is the "demo" user. ACCESS_TEAM_DOMAIN is
-      // "<team>.cloudflareaccess.com", ACCESS_AUD the application's AUD tag.
+      // them the deployed Worker answers 401 to everything. ACCESS_TEAM_DOMAIN
+      // is "<team>.cloudflareaccess.com", ACCESS_AUD the application's AUD tag.
       ACCESS_TEAM_DOMAIN: bindings.text(deploy.accessTeamDomain ?? ""),
       ACCESS_AUD: bindings.text(deploy.accessAud ?? ""),
+      // "1" opens a deploy without Access to anyone, as the shared "demo"
+      // user with full control of its bots and shells. Demos only.
+      ALLOW_DEMO: bindings.text(deploy.allowDemo ? "1" : ""),
       // Domain with Email Routing that forwards to this Worker (catch-all
       // or one rule per bot). Each bot gets <user>.<bot>@EMAIL_DOMAIN.
       // Empty turns inbound email off.

@@ -1,6 +1,11 @@
 import handler from "@tanstack/react-start/server-entry"
 import { getAgentByName, routeAgentEmail, routeAgentRequest } from "agents"
-import { Unauthorized, identify } from "@/lib/auth"
+import {
+  Unauthorized,
+  accessConfigured,
+  demoAllowed,
+  identify,
+} from "@/lib/auth"
 import { botInstanceName } from "@/lib/types"
 import { handleAppRequest } from "./agents/apps-runtime"
 import { emailDirectory } from "./agents/email-directory"
@@ -44,6 +49,14 @@ export default {
     // page among them checks Access itself.
     const oauth = await handleOAuthRequest(request, env, ctx)
     if (oauth) return oauth
+
+    // Without Access, a deploy has no way to tell visitors apart.
+    if (!accessConfigured() && !demoAllowed()) {
+      return new Response(
+        "Unauthorized: set ACCESS_TEAM_DOMAIN and ACCESS_AUD, or allowDemo",
+        { status: 401 }
+      )
+    }
 
     const target = agentInstance(new URL(request.url).pathname)
     if (target) {
