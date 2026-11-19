@@ -7,7 +7,7 @@ import type { AppDataOp } from "./apps-runtime"
  * Who may do what through an app link.
  *
  *   edit    everything
- *   view    read everything, write nothing
+ *   view    read everything, write nothing (page errors count as writes)
  *   submit  a public form: add new items to the app's `submit` collections,
  *           read its `read` collections, and read back only the items it
  *           added, by the id it got back. Nothing else.
@@ -81,7 +81,8 @@ export function authorize(
   op: AppDataOp
 ): Decision {
   if (mode === "edit") return { ok: true, op }
-  if (op.op === "info" || op.op === "error") return { ok: true, op }
+  // Page errors land in the bot's prompt, so they count as writes.
+  if (op.op === "info") return { ok: true, op }
 
   if (mode === "view") {
     if (op.op === "list" || op.op === "get") return { ok: true, op }
@@ -122,6 +123,7 @@ export function authorize(
     case "remove":
       return deny("A public link cannot delete")
     case "tell":
+    case "error":
       return deny("A public link cannot message the bot")
   }
 }

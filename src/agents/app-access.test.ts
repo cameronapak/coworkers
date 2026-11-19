@@ -94,6 +94,7 @@ describe("edit and view links stay as they were", () => {
     { op: "put", collection: "anything", item: { v: 1 }, merge: true },
     { op: "remove", collection: "anything", id: "a" },
     { op: "tell", text: "hi" },
+    { op: "error", message: "x is undefined" },
   ]
 
   it("edit may do everything, unchanged", () => {
@@ -195,8 +196,12 @@ describe("use case: an anonymous survey", () => {
     })
   })
 
-  it("page errors still reach the bot so it can fix the form", () => {
-    expect(visitor({ op: "error", message: "x is undefined" }).ok).toBe(true)
+  it("a visitor cannot report page errors to the bot", () => {
+    // The message and stack are caller text that would land in the bot's prompt.
+    expect(visitor({ op: "error", message: "x is undefined" })).toMatchObject({
+      ok: false,
+      status: 403,
+    })
   })
 
   it("an answer that is too long is refused before it is stored", () => {
