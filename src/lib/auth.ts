@@ -1,4 +1,8 @@
+import { getAgentByName } from "agents"
 import { env } from "cloudflare:workers"
+import { emailDirectory } from "@/agents/email-directory"
+import type { UserHub } from "@/agents/user-hub"
+import { legacyUserIdForEmail, userIdForEmail } from "@/lib/user-id"
 
 /**
  * Who is making this request.
@@ -56,11 +60,46 @@ export async function identify(request: Request): Promise<Identity> {
   const claims = await verifyAccessJwt(token)
   const email = typeof claims.email === "string" ? claims.email : null
   if (!email) throw new Unauthorized("Access token has no email")
-  return { id: userIdForEmail(email), email }
+  return { id: await userIdFor(email), email }
 }
 
-export function userIdForEmail(email: string) {
-  return email.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+/** Email → user ID. Bindings never change, so each isolate keeps them. */
+const userIds = new Map<string, string>()
+
+/**
+ * The user ID bound to this Access email in the `EmailDirectory`, binding
+ * one on first sign-in. New users get the hashed `userIdForEmail`. A user
+ * whose hub predates hashed IDs keeps its legacy ID, but only the first
+ * email to claim it gets it: any other email that folds to the same legacy
+ * ID gets its own hashed ID and its own hub.
+ */
+async function userIdFor(email: string) {
+  const key = email.toLowerCase()
+  const cached = userIds.get(key)
+  if (cached) return cached
+  const directory = emailDirectory(env)
+  let id = await directory.userFor(key)
+  if (!id) {
+    const candidates = [await userIdForEmail(key)]
+    const legacy = legacyUserIdForEmail(key)
+    if (
+      !(await directory.userIdTaken(legacy)) &&
+      (await legacyHubInUse(legacy))
+    ) {
+      candidates.unshift(legacy)
+    }
+    id = await directory.bindUser(key, candidates)
+  }
+  userIds.set(key, id)
+  return id
+}
+
+async function legacyHubInUse(userId: string) {
+  const hub = await getAgentByName(
+    env.UserHub as unknown as DurableObjectNamespace<UserHub>,
+    userId
+  )
+  return (await hub.listBots()).length > 0
 }
 
 function cookie(request: Request, name: string) {
