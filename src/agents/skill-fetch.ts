@@ -7,6 +7,7 @@
 
 /** Largest decompressed archive we read. */
 const MAX_ARCHIVE_BYTES = 48 * 1024 * 1024
+const MAX_TAR_ENTRIES = 100_000
 /** Files above this stay behind: a skill is instructions, not data. */
 export const MAX_SKILL_FILE_BYTES = 256 * 1024
 export const MAX_SKILL_BYTES = 1024 * 1024
@@ -231,8 +232,16 @@ export function parseTar(tar: Uint8Array) {
   let commit = ""
   let longName: string | undefined
   let at = 0
+  let entries = 0
   while (at + 512 <= tar.length && tar[at] !== 0) {
-    const size = parseInt(tarString(tar, at + 124, 12).trim() || "0", 8)
+    if (++entries > MAX_TAR_ENTRIES) {
+      throw new SkillSourceError("That archive has too many files.")
+    }
+    const sizeField = tarString(tar, at + 124, 12).trim() || "0"
+    const size = /^[0-7]+$/.test(sizeField) ? parseInt(sizeField, 8) : NaN
+    if (!Number.isSafeInteger(size) || at + 512 + size > tar.length) {
+      throw new SkillSourceError("That archive is damaged.")
+    }
     const type = String.fromCharCode(tar[at + 156] || 48)
     const body = tar.subarray(at + 512, at + 512 + size)
     if (type === "g") commit = paxRecords(body).comment ?? commit
