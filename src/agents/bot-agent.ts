@@ -2754,7 +2754,12 @@ export class BotAgent extends Think<Env, BotState> {
   ): Promise<{ value: unknown } | { error: string; status: number }> {
     const app = this.apps.get(slug)
     if (!app) return { error: "Not found", status: 404 }
-    const writes = op.op === "put" || op.op === "remove" || op.op === "tell"
+    // Anything that reaches the bot's prompt counts as a write.
+    const writes =
+      op.op === "put" ||
+      op.op === "remove" ||
+      op.op === "tell" ||
+      op.op === "error"
     if (writes && caller.mode !== "edit") {
       return { error: "This link is view-only", status: 403 }
     }
