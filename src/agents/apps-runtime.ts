@@ -19,7 +19,7 @@ import type { UserHub } from "./user-hub"
  *   _coworkers.js     the browser helper (window.coworkers)
  *   _data[/c[/id]]    JSON API over the app's collections
  *   _tell             POST { text }: message the bot
- *   _error            POST { message, stack, source }: a page error, for the bot to fix
+ *   _error            POST { message, stack, source }: a page error, for the bot to fix (edit links only)
  *   _live             WebSocket: change and reload events (AppLive)
  */
 
