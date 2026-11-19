@@ -12,7 +12,7 @@ What this system protects, who can reach it, and which attackers count. Security
 
 ## Trust boundaries and entry points
 
-one Worker behind Cloudflare Access (JWT, `ACCESS_TEAM_DOMAIN`/`ACCESS_AUD`); without Access configured everyone is the `demo` user. Users reach only their own UserHub and bots (`ownsInstance`). Bots run AI agents with browsers, dynamic workers (code execution), email, per-bot secrets, and build apps served at `/apps/*` authenticated by link token; webhooks at `/api/hooks/$userId/$botId/$token`; outside agents via MCP OAuth. Prompt injection from web pages/email into bot actions, and destructive ops gated by user approval (`runOperation`), are central.
+one Worker behind Cloudflare Access (JWT, `ACCESS_TEAM_DOMAIN`/`ACCESS_AUD`); without Access configured a deployed Worker answers 401 unless `ALLOW_DEMO` is "1", which makes everyone the `demo` user. Users reach only their own UserHub and bots (`ownsInstance`). Bots run AI agents with browsers, dynamic workers (code execution), email, per-bot secrets, and build apps served at `/apps/*` authenticated by link token; webhooks at `/api/hooks/$userId/$botId/$token`; outside agents via MCP OAuth. Prompt injection from web pages/email into bot actions, and destructive ops gated by user approval (`runOperation`), are central.
 
 ## Assets
 
@@ -26,7 +26,7 @@ All assets matter equally **(owner)**.
 
 Every attacker below matters **(owner)**.
 
-- Anyone on the internet if Cloudflare Access is not configured (everyone becomes the `demo` user).
+- Anyone on the internet if Cloudflare Access is not configured and `ALLOW_DEMO` is "1" (everyone becomes the `demo` user); without the opt-in the Worker answers 401.
 - Malicious web pages and emails read by bots (prompt injection).
 - Holders of app link tokens, webhook tokens or MCP OAuth tokens.
 

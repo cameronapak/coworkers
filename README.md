@@ -259,9 +259,9 @@ cf ai-gateway gateways create --id coworkers --authentication --collect-logs \
   --rate-limiting-interval 0 --rate-limiting-limit 0
 ```
 
-**2. Write `coworkers.deploy.json`** in the repo root. Leaving out the Access
-values deploys Coworkers open to everyone as the `demo` user, so start with
-placeholders that lock it:
+**2. Write `coworkers.deploy.json`** in the repo root. Without the Access
+values the deployed Worker answers 401 to everything; start with placeholders
+that lock it:
 
 ```json
 {
@@ -325,7 +325,7 @@ credits or your own provider key to the gateway, then press **Test**.
 
 Set in `cloudflare.config.ts`. Everything has a working default.
 `coworkers.deploy.json`, if present, overrides the name, `MODEL`,
-`AI_GATEWAY_ID` and the two `ACCESS_*` values.
+`AI_GATEWAY_ID`, the two `ACCESS_*` values and `ALLOW_DEMO`.
 
 | Setting                  | What it does                                                          |
 | ------------------------ | --------------------------------------------------------------------- |
@@ -335,6 +335,7 @@ Set in `cloudflare.config.ts`. Everything has a working default.
 | `AI_GATEWAY_ID`          | Gateway for every model call. Empty = `default` (created on first use) |
 | `ACCESS_TEAM_DOMAIN`     | With `ACCESS_AUD`, require a valid Access token on every request       |
 | `ACCESS_AUD`             | The Access application's AUD tag                                       |
+| `ALLOW_DEMO`             | `"allowDemo": true` in the deploy file: without Access, open the app to anyone as `demo` |
 | `QUICK_ACTION_ENGINE`    | `kitesurf` (cheaper) or `chromium` for quick page reads                |
 | `EMAIL_DOMAIN`           | Turns on inbound email. Each bot gets `<user>.<bot>@<domain>`         |
 | `BROWSER_RUN_ACCOUNT_ID` | With `BROWSER_RUN_API_TOKEN` (secret), turns on the crawl tool        |
