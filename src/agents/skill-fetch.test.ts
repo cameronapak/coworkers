@@ -152,6 +152,21 @@ describe("parseTar", () => {
     expect(files.map((f) => f.path)).toEqual(["repo/one.md", long])
     expect(new TextDecoder().decode(files[0].bytes)).toBe("hello")
   })
+
+  it("refuses a negative size instead of looping", () => {
+    const archive = tar(tarEntry("repo/one.md", "hello"))
+    archive.set(encode("-1000".padEnd(11, " ")), 124)
+    expect(() => parseTar(archive)).toThrow(SkillSourceError)
+  })
+
+  it("refuses a size that is not octal or runs past the end", () => {
+    const bad = tar(tarEntry("repo/one.md", "hello"))
+    bad.set(encode("zz".padEnd(11, " ")), 124)
+    expect(() => parseTar(bad)).toThrow(SkillSourceError)
+    const long = tar(tarEntry("repo/one.md", "hello"))
+    long.set(encode((1 << 20).toString(8).padStart(11, "0")), 124)
+    expect(() => parseTar(long)).toThrow(SkillSourceError)
+  })
 })
 
 describe("parseSkillMd", () => {
