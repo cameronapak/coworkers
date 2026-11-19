@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { env } from "cloudflare:workers"
 import { getAgentByName } from "agents"
 import { z } from "zod"
-import { DEMO_PROFILE_COOKIE, accessConfigured } from "@/lib/auth"
+import { DEMO_PROFILE_COOKIE, demoAllowed } from "@/lib/auth"
 import type { UserHub } from "@/agents/user-hub"
 
 const querySchema = z.object({
@@ -11,7 +11,7 @@ const querySchema = z.object({
 })
 
 /**
- * Local demos only (no Access): `/api/demo-profile?as=jane&seed=1` fills
+ * Demo mode only (local dev, or ALLOW_DEMO without Access): `/api/demo-profile?as=jane&seed=1` fills
  * Jane's profile with fresh demo data and switches this browser to it;
  * `?as=you` switches back to your own.
  */
@@ -19,8 +19,7 @@ export const Route = createFileRoute("/api/demo-profile")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (accessConfigured())
-          return new Response("Not found", { status: 404 })
+        if (!demoAllowed()) return new Response("Not found", { status: 404 })
         const parsed = querySchema.safeParse(
           Object.fromEntries(new URL(request.url).searchParams)
         )

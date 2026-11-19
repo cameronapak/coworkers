@@ -6,8 +6,8 @@ import { env } from "cloudflare:workers"
  * Put the Worker behind Cloudflare Access and set ACCESS_TEAM_DOMAIN and
  * ACCESS_AUD (the installer does both): every request must then carry a
  * valid Access JWT, and each Access identity gets its own UserHub. Without
- * them (local dev, or an unprotected deploy) everyone is the same `demo`
- * user.
+ * them, local dev runs as the shared `demo` user; a deployed Worker refuses
+ * every request unless ALLOW_DEMO is "1", which opens it to anyone as `demo`.
  */
 export const DEMO_USER_ID = "demo"
 
@@ -29,7 +29,7 @@ export interface Identity {
   email: string | null
 }
 
-/** Thrown when Access is configured and the request did not pass it. */
+/** Thrown when the request did not pass Access, or Access is not set up. */
 export class Unauthorized extends Error {}
 
 export function accessConfigured() {
@@ -39,6 +39,15 @@ export function accessConfigured() {
   return !!(env.ACCESS_TEAM_DOMAIN?.trim() && env.ACCESS_AUD?.trim())
 }
 
+/**
+ * Requests run as the shared `demo` user, with no sign-in: local dev, or a
+ * deploy without Access that opted in with ALLOW_DEMO = "1".
+ */
+export function demoAllowed() {
+  if (import.meta.env.DEV) return true
+  return !accessConfigured() && env.ALLOW_DEMO?.trim() === "1"
+}
+
 /** `https://<team>.cloudflareaccess.com`, however it was entered. */
 function issuer() {
   const domain = env.ACCESS_TEAM_DOMAIN.trim().replace(/\/+$/, "")
@@ -46,8 +55,11 @@ function issuer() {
 }
 
 export async function identify(request: Request): Promise<Identity> {
-  if (!accessConfigured()) {
+  if (demoAllowed()) {
     return { id: demoProfileOf(request) ?? DEMO_USER_ID, email: null }
+  }
+  if (!accessConfigured()) {
+    throw new Unauthorized("Access is not configured")
   }
   const token =
     request.headers.get("Cf-Access-Jwt-Assertion") ??
